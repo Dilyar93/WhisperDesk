@@ -1,5 +1,8 @@
 faster-whisper==1.0.3
 ctranslate2==4.4.0
+# 必须钉 numpy<2：numpy 2.x 的 _core._multiarray_umath 用 pybind11 单阶段初始化，
+# 若被 PyInstaller 重复打包会抛 `cannot load module more than once per process`。
+numpy<2
 PySide6==6.7.2
 pyqtdarktheme==2.1.0
 huggingface_hub>=0.23.0
