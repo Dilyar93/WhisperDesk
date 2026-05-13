@@ -67,6 +67,10 @@ class TranscribeWorker(QThread):
         self.vad_filter = vad_filter
         self.initial_prompt = initial_prompt or None
         self._cancel = False
+        # 保留 model 引用，避免 run() 返回瞬间 worker 线程析构 CTranslate2 / CUDA
+        # 资源触发 abort（已知的 Windows + GPU 清理崩溃）。让它随 worker 对象一起
+        # 由后续的 GC 释放，弹窗/导出期间就不会和 GPU 清理并发。
+        self.model = None
 
     def cancel(self) -> None:
         self._cancel = True
@@ -103,6 +107,7 @@ class TranscribeWorker(QThread):
                 compute_type=self.compute_type,
                 local_files_only=True,
             )
+            self.model = model
         except Exception as e:
             msg_lower = str(e).lower()
             if "out of memory" in msg_lower or ("cuda" in msg_lower and "memory" in msg_lower):
