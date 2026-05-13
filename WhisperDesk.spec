@@ -1,10 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 """WhisperDesk PyInstaller spec. One-folder Windows build.
 
-DLL 收集通过本仓库 `hooks/hook-ctranslate2.py` 覆盖 pyinstaller-hooks-contrib
-的默认行为：只收 .dll，过滤掉 .pyd（.pyd 留在 ctranslate2 包目录里，避免
-pybind11 因同一扩展被加载到两个路径而报
-`cannot load module more than once per process`）。
+依赖收集交给 pyinstaller-hooks-contrib 的官方 hook（ctranslate2 / tokenizers /
+huggingface_hub 等），本 spec 只负责：
+  1) 带上 app/resources 的 qss / icon；
+  2) 带上 faster_whisper 包内的 silero VAD 资源；
+  3) 用 hiddenimports 告知静态分析器跟踪这些包。
+
+根因备忘：`cannot load module more than once per process` 是 numpy 2.x +
+PyInstaller < 6.11.1 的已知 bug。处理办法是：
+  - requirements.txt 钉 numpy<2；
+  - requirements-build.txt 要求 pyinstaller>=6.11.1。
 """
 from PyInstaller.utils.hooks import collect_data_files
 import os
@@ -19,10 +25,9 @@ datas += [("app/resources/style.qss", "app/resources")]
 if os.path.exists("app/resources/icon.ico"):
     datas += [("app/resources/icon.ico", "app/resources")]
 
-# faster_whisper 自带的 silero VAD 模型等 assets（必须打包，否则 VAD 启用时报错）
+# faster_whisper 自带的 silero VAD 模型等 assets（VAD 启用时必须存在）
 datas += collect_data_files("faster_whisper")
 
-# 声明为依赖，让静态分析跟踪到；真正的 DLL 由自定义 hook 处理
 hiddenimports = [
     "ctranslate2",
     "tokenizers",
@@ -34,7 +39,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=["hooks"],
+    hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=["tkinter", "unittest", "test"],
