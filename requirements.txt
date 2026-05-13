@@ -5,7 +5,10 @@ ctranslate2==4.4.0
 numpy>=1.24,<2
 # faster-whisper 1.0.3 依赖（本地 import 探测验证的完整运行时闭包）
 av>=11,<13                         # 音频解码（PyAV），带 FFmpeg C 扩展
-onnxruntime>=1.17,<2               # VAD（Silero）必需，带原生 DLL
+# onnxruntime 必须钉在 1.18.x：1.19+ 在 Windows 上与 ctranslate2 的 CUDA/OpenMP
+# 共存时会出 `DllMain 初始化失败`，这是 onnxruntime 社区 issue #21764 / #22007
+# 反复确认的兼容窗口。faster-whisper 1.0.3 的 silero VAD 不需要新特性。
+onnxruntime==1.18.1               # VAD（Silero）必需，带原生 DLL
 tokenizers>=0.15,<0.20
 # huggingface_hub 1.x 换了 httpx 且 API 破坏，必须锁在 0.x 代
 huggingface_hub>=0.23,<1
