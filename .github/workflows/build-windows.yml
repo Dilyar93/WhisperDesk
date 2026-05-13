@@ -1,0 +1,103 @@
+name: Build Windows Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      oss_prefix:
+        description: "OSS 路径前缀（默认 releases/whisperdesk/latest）"
+        required: false
+        default: "releases/whisperdesk/latest"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Build with PyInstaller
+        shell: pwsh
+        run: pyinstaller WhisperDesk.spec --noconfirm
+
+      - name: Bundle ffmpeg
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
+          New-Item -ItemType Directory -Force -Path dist/WhisperDesk/ffmpeg | Out-Null
+          $src = (Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName
+          Copy-Item $src dist/WhisperDesk/ffmpeg/ffmpeg.exe
+
+      - name: Add runtime dirs & docs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/WhisperDesk/models | Out-Null
+          New-Item -ItemType Directory -Force -Path dist/WhisperDesk/output | Out-Null
+          Copy-Item dist_assets/PUT_MODEL_HERE.txt dist/WhisperDesk/models/PUT_MODEL_HERE.txt
+          Copy-Item "dist_assets/使用说明.txt" "dist/WhisperDesk/使用说明.txt"
+
+      - name: Create release zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/WhisperDesk/* -DestinationPath dist/WhisperDesk-win64.zip -Force
+
+      - name: Prepare OSS env vars
+        shell: pwsh
+        run: |
+          $prefix = "${{ github.event.inputs.oss_prefix }}"
+          if (-not $prefix) { $prefix = "releases/whisperdesk/latest" }
+          "OSS_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+
+      - name: Upload zip to Alibaba Cloud OSS (public-read)
+        shell: pwsh
+        env:
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+          OSS_REGION: ${{ secrets.OSS_REGION }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
+          OSS_AK: ${{ secrets.OSS_AK }}
+          OSS_SK: ${{ secrets.OSS_SK }}
+          OSS_PREFIX: ${{ env.OSS_PREFIX }}
+        run: |
+          if (-not $env:OSS_BUCKET) {
+            Write-Host "OSS_BUCKET 未配置，跳过 OSS 上传。可通过 actions/upload-artifact 下载。"
+            exit 0
+          }
+          $oss = "$env:RUNNER_TEMP\ossutil64.exe"
+          Invoke-WebRequest -Uri "https://gosspublic.alicdn.com/ossutil/1.7.17/ossutil64.exe" -OutFile $oss
+
+          $cfg = "$HOME\.ossutilconfig"
+          $content = @"
+          [Credentials]
+          language=CH
+          endpoint=$env:OSS_ENDPOINT
+          accessKeyID=$env:OSS_AK
+          accessKeySecret=$env:OSS_SK
+          "@
+          $content | Out-File -FilePath $cfg -Encoding ascii
+
+          & $oss cp "dist/WhisperDesk-win64.zip" "oss://$env:OSS_BUCKET/$env:OSS_PREFIX/" --update --force --config-file $cfg
+          & $oss set-acl "oss://$env:OSS_BUCKET/$env:OSS_PREFIX/" public-read -r --config-file $cfg
+
+          $url = "https://$env:OSS_BUCKET.$env:OSS_REGION.aliyuncs.com/$env:OSS_PREFIX/WhisperDesk-win64.zip"
+          Write-Host "================ Download URL ================"
+          Write-Host $url
+          Write-Host "=============================================="
+
+      - name: Upload artifact (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: WhisperDesk-win64
+          path: dist/WhisperDesk-win64.zip
+          retention-days: 7
