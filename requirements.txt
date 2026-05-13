@@ -6,3 +6,9 @@ numpy<2
 PySide6==6.7.2
 pyqtdarktheme==2.1.0
 huggingface_hub>=0.23.0
+# 以下是 huggingface_hub 的运行时依赖，显式列出避免 PyInstaller 漏收或 CI 版本漂移
+requests>=2.31.0
+certifi>=2024.2.2
+urllib3>=2.0.0
+charset_normalizer>=3.3.0
+idna>=3.6
