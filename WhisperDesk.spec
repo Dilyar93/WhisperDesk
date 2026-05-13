@@ -12,7 +12,7 @@ PyInstaller < 6.11.1 的已知 bug。处理办法是：
   - requirements.txt 钉 numpy<2；
   - requirements-build.txt 要求 pyinstaller>=6.11.1。
 """
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import os
 
 block_cipher = None
@@ -28,10 +28,28 @@ if os.path.exists("app/resources/icon.ico"):
 # faster_whisper 自带的 silero VAD 模型等 assets（VAD 启用时必须存在）
 datas += collect_data_files("faster_whisper")
 
+# huggingface_hub 会动态 import requests / urllib3 / certifi / charset_normalizer 等，
+# PyInstaller 静态分析跟不到，需要整包 submodules + 显式 hiddenimports 兜底。
 hiddenimports = [
     "ctranslate2",
     "tokenizers",
+    "requests",
+    "urllib3",
+    "certifi",
+    "charset_normalizer",
+    "idna",
+    "filelock",
+    "fsspec",
+    "packaging",
+    "tqdm",
+    "pyyaml",
 ]
+hiddenimports += collect_submodules("huggingface_hub")
+hiddenimports += collect_submodules("requests")
+
+# requests / certifi 需要带上 CA 证书等 data files
+datas += collect_data_files("certifi")
+datas += collect_data_files("huggingface_hub")
 
 a = Analysis(
     ["app/main.py"],
