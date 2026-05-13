@@ -30,9 +30,10 @@ if os.path.exists("app/resources/icon.ico"):
 datas += collect_data_files("faster_whisper")
 
 # 本地 import 探测确认的完整运行时闭包。带原生 DLL / C 扩展的包必须 collect_all。
+# 注意：onnxruntime 交给 pyinstaller-hooks-contrib 的官方 hook（会自动生效），
+# 我们不再重复 collect_all 避免 DLL 被拷到两个路径触发 DllMain 冲突。
 for pkg in (
     "av",              # PyAV：解码音频，带 FFmpeg DLL
-    "onnxruntime",     # VAD 后端，带 onnxruntime*.dll
     "ctranslate2",     # 推理后端，带 ctranslate2.dll / cublas 等
     "tokenizers",      # Rust 扩展
     "huggingface_hub",
