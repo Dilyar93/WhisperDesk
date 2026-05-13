@@ -225,18 +225,37 @@ class MainWindow(QMainWindow):
                 return
 
     def _refresh_models(self) -> None:
+        """扫描 models/ 下的模型，兜底使用 resolve_model_dir 同款探测逻辑。"""
         self.model_combo.clear()
         root = paths.models_root()
-        found = []
+        found: list[tuple[str, str]] = []  # (display_name, data=dir_name_key)
+
         if root.exists():
+            seen: set[str] = set()
+            # 一级：models/<name>/model.bin
             for child in root.iterdir():
                 if child.is_dir() and (child / "model.bin").exists():
-                    found.append(child.name)
+                    found.append((child.name, child.name))
+                    seen.add(child.name)
+            # 二级兜底：models/<outer>/<inner>/model.bin  （嵌套一层）
+            for child in root.iterdir():
+                if not child.is_dir() or child.name in seen:
+                    continue
+                try:
+                    for gc in child.iterdir():
+                        if gc.is_dir() and (gc / "model.bin").exists():
+                            # 下拉框显示外层名，因为 resolve_model_dir 会用外层名探测
+                            found.append((f"{child.name} (嵌套)", child.name))
+                            seen.add(child.name)
+                            break
+                except OSError:
+                    continue
+
         if not found:
             self.model_combo.addItem("(未检测到模型)", "")
         else:
-            for name in sorted(found):
-                self.model_combo.addItem(name, name)
+            for display, data in sorted(found):
+                self.model_combo.addItem(display, data)
             self._select_by_data(self.model_combo, self.cfg.model_name)
 
     # ---------- file handling ----------
