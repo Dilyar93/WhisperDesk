@@ -1,0 +1,11 @@
+请把解压得到的 faster-whisper-large-v3 整个文件夹放到此目录下。
+
+最终文件结构应为：
+
+    models\faster-whisper-large-v3\model.bin
+    models\faster-whisper-large-v3\tokenizer.json
+    models\faster-whisper-large-v3\config.json
+    ...
+
+如果你放错了位置（比如多套了一层文件夹），软件也会尝试自动识别，
+仍然识别失败时会弹出对话框引导你。
