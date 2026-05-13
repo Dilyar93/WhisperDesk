@@ -1,2 +1,4 @@
-pyinstaller==6.6.0
-pyinstaller-hooks-contrib>=2024.6
+# PyInstaller >= 6.11.1 修复了 Windows 上 numpy PyPI wheel 共享库被重复打包的 bug
+# （官方 changelog: "fix duplication of shared libraries bundled with numpy < 1.26 PyPI wheels on Windows"）
+pyinstaller>=6.11.1
+pyinstaller-hooks-contrib>=2024.9
