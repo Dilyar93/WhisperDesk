@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import Optional
 
 from PySide6.QtCore import QThread, Signal
@@ -70,11 +71,16 @@ class TranscribeWorker(QThread):
     def cancel(self) -> None:
         self._cancel = True
 
+    def _fail(self, msg: str) -> None:
+        """同时打日志并发信号，避免用户打不开日志时无从诊断。"""
+        log.error("%s\n%s", msg, traceback.format_exc())
+        self.failed.emit(msg)
+
     def run(self) -> None:  # noqa: C901
         try:
             from faster_whisper import WhisperModel
         except Exception as e:
-            self.failed.emit(f"faster-whisper 未正确安装: {e}")
+            self._fail(f"faster-whisper 导入失败: {type(e).__name__}: {e}")
             return
 
         try:
@@ -86,11 +92,11 @@ class TranscribeWorker(QThread):
                 local_files_only=True,
             )
         except Exception as e:
-            msg = str(e)
-            if "out of memory" in msg.lower() or "cuda" in msg.lower() and "memory" in msg.lower():
-                self.failed.emit(f"GPU 显存不足，建议在设置中把精度改为 int8_float16 或切换到 CPU。\n原始错误: {e}")
+            msg_lower = str(e).lower()
+            if "out of memory" in msg_lower or ("cuda" in msg_lower and "memory" in msg_lower):
+                self._fail(f"GPU 显存不足，建议在设置中把精度改为 int8_float16 或切换到 CPU。\n原始错误: {e}")
             else:
-                self.failed.emit(f"模型加载失败: {e}")
+                self._fail(f"模型加载失败: {type(e).__name__}: {e}")
             return
 
         try:
@@ -103,7 +109,7 @@ class TranscribeWorker(QThread):
                 word_timestamps=False,
             )
         except Exception as e:
-            self.failed.emit(f"无法读取音频或启动转写: {e}")
+            self._fail(f"无法读取音频或启动转写: {type(e).__name__}: {e}")
             return
 
         total = float(getattr(info, "duration", 0.0) or 0.0)
@@ -118,7 +124,7 @@ class TranscribeWorker(QThread):
                 self.segment.emit(item["start"], item["end"], item["text"])
                 self.progress.emit(item["end"], total)
         except Exception as e:
-            self.failed.emit(f"转写过程中出错: {e}")
+            self._fail(f"转写过程中出错: {type(e).__name__}: {e}")
             return
 
         self.finished_ok.emit(
