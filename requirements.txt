@@ -2,13 +2,25 @@ faster-whisper==1.0.3
 ctranslate2==4.4.0
 # 必须钉 numpy<2：numpy 2.x 的 _core._multiarray_umath 用 pybind11 单阶段初始化，
 # 若被 PyInstaller 重复打包会抛 `cannot load module more than once per process`。
-numpy<2
-PySide6==6.7.2
-pyqtdarktheme==2.1.0
-huggingface_hub>=0.23.0
-# 以下是 huggingface_hub 的运行时依赖，显式列出避免 PyInstaller 漏收或 CI 版本漂移
+numpy>=1.24,<2
+# faster-whisper 1.0.3 依赖（本地 import 探测验证的完整运行时闭包）
+av>=11,<13                         # 音频解码（PyAV），带 FFmpeg C 扩展
+onnxruntime>=1.17,<2               # VAD（Silero）必需，带原生 DLL
+tokenizers>=0.15,<0.20
+# huggingface_hub 1.x 换了 httpx 且 API 破坏，必须锁在 0.x 代
+huggingface_hub>=0.23,<1
+# HTTP/下载链路（faster_whisper.utils 直接 import requests）
 requests>=2.31.0
 certifi>=2024.2.2
 urllib3>=2.0.0
 charset_normalizer>=3.3.0
 idna>=3.6
+# hub 链路常见
+filelock>=3.13
+fsspec>=2024.3.0
+tqdm>=4.66
+pyyaml>=6.0
+packaging>=23.0
+# GUI
+PySide6==6.7.2
+pyqtdarktheme==2.1.0
