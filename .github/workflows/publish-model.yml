@@ -1,0 +1,112 @@
+name: Publish Model to OSS
+
+# 仅手动触发。模型不常变，没必要每次 push 都跑 3GB 上传。
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "HuggingFace repo id"
+        required: false
+        default: "Systran/faster-whisper-large-v3"
+      oss_prefix:
+        description: "OSS 路径前缀"
+        required: false
+        default: "releases/whisperdesk/models"
+      hf_mirror:
+        description: "HF 镜像（留空用官方；国内 runner 可填 https://hf-mirror.com）"
+        required: false
+        default: ""
+
+jobs:
+  publish-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install huggingface_hub
+        run: pip install --upgrade pip huggingface_hub
+
+      - name: Download model from HuggingFace
+        shell: bash
+        env:
+          HF_ENDPOINT: ${{ github.event.inputs.hf_mirror }}
+        run: |
+          if [ -z "$HF_ENDPOINT" ]; then
+            unset HF_ENDPOINT
+          else
+            echo "[i] 使用 HF 镜像: $HF_ENDPOINT"
+          fi
+          python scripts/download_model.py \
+            --repo "${{ github.event.inputs.repo }}" \
+            --out models/faster-whisper-large-v3
+
+      - name: Show disk usage
+        run: |
+          du -sh models/faster-whisper-large-v3 || true
+          df -h .
+
+      - name: Pack model into zip
+        run: python scripts/pack_model.py
+
+      - name: List outputs
+        run: ls -lah dist/
+
+      - name: Install ossutil
+        shell: bash
+        run: |
+          curl -sSL -o /usr/local/bin/ossutil \
+            https://gosspublic.alicdn.com/ossutil/1.7.17/ossutil64
+          chmod +x /usr/local/bin/ossutil
+          ossutil --version
+
+      - name: Upload zip to Aliyun OSS (public-read)
+        shell: bash
+        env:
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
+          OSS_REGION: ${{ secrets.OSS_REGION }}
+          OSS_AK: ${{ secrets.OSS_AK }}
+          OSS_SK: ${{ secrets.OSS_SK }}
+          OSS_PREFIX: ${{ github.event.inputs.oss_prefix }}
+        run: |
+          if [ -z "$OSS_BUCKET" ]; then
+            echo "OSS_BUCKET 未配置，无法上传。请先在仓库 Secrets 里配 OSS_*。"
+            exit 1
+          fi
+
+          cat > "$HOME/.ossutilconfig" <<EOF
+          [Credentials]
+          language=CH
+          endpoint=$OSS_ENDPOINT
+          accessKeyID=$OSS_AK
+          accessKeySecret=$OSS_SK
+          EOF
+
+          # 分片上传 3GB 大文件
+          ossutil cp "dist/faster-whisper-large-v3.zip" \
+            "oss://$OSS_BUCKET/$OSS_PREFIX/" \
+            --update --force \
+            --parallel 8 --part-size 8388608 \
+            --config-file "$HOME/.ossutilconfig"
+
+          ossutil cp "dist/SHA256SUMS.txt" \
+            "oss://$OSS_BUCKET/$OSS_PREFIX/" \
+            --update --force \
+            --config-file "$HOME/.ossutilconfig"
+
+          # 仅该前缀设为 public-read
+          ossutil set-acl "oss://$OSS_BUCKET/$OSS_PREFIX/" public-read -r \
+            --config-file "$HOME/.ossutilconfig"
+
+          URL="https://$OSS_BUCKET.$OSS_REGION.aliyuncs.com/$OSS_PREFIX/faster-whisper-large-v3.zip"
+          SHA_URL="https://$OSS_BUCKET.$OSS_REGION.aliyuncs.com/$OSS_PREFIX/SHA256SUMS.txt"
+          echo "================ Model Download URL ================"
+          echo "$URL"
+          echo "$SHA_URL"
+          echo "===================================================="
