@@ -72,9 +72,21 @@ class TranscribeWorker(QThread):
         self._cancel = True
 
     def _fail(self, msg: str) -> None:
-        """同时打日志并发信号，避免用户打不开日志时无从诊断。"""
-        log.error("%s\n%s", msg, traceback.format_exc())
-        self.failed.emit(msg)
+        """同时打日志并发信号，避免用户打不开日志时无从诊断。
+
+        会把异常链（__cause__ / __context__）完整展开到日志和信号里，
+        否则 `raise ... from e` 的底层原因（比如 DLL load failed）被遮住。
+        """
+        full = traceback.format_exc()  # 当前异常 + from e 链（Python 自动串）
+        log.error("%s\n%s", msg, full)
+        # UI 弹窗也把真实底层原因放出来，便于一次到位定位
+        lines = [msg]
+        for line in full.splitlines():
+            s = line.strip()
+            if s.startswith(("ImportError:", "OSError:", "FileNotFoundError:", "RuntimeError:",
+                             "ModuleNotFoundError:", "DLL load failed")):
+                lines.append(s)
+        self.failed.emit("\n".join(lines))
 
     def run(self) -> None:  # noqa: C901
         try:
