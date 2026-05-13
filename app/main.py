@@ -1,6 +1,14 @@
 """WhisperDesk 入口：创建 QApplication、应用主题与 QSS、启动主窗口。"""
 from __future__ import annotations
 
+# 必须在任何原生扩展（numpy / ctranslate2 / onnxruntime）import 前设置，
+# 规避 ctranslate2 与 onnxruntime 各带一份 libiomp5md.dll 导致的
+# 进程退出时 `Fatal Python error: Aborted`。冻结环境下 rthook 已经设过，
+# 这里是开发模式 / 直接运行的兜底。
+import os as _os
+_os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+_os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+
 import logging
 import sys
 from pathlib import Path
