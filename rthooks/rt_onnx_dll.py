@@ -18,6 +18,16 @@ import os
 import sys
 
 
+# --- OpenMP 运行时冲突规避 ---
+# ctranslate2 和 onnxruntime 各自静态链接了一份 Intel OpenMP（libiomp5md.dll）。
+# 两份 OMP 运行时共存时，Intel 的检测逻辑会在进程退出阶段调用 abort()，
+# 表现为推理跑完、主窗口弹出"转写完成"对话框瞬间 `Fatal Python error: Aborted`。
+# 这两个变量必须在任何原生扩展（numpy / ctranslate2 / onnxruntime）加载前设置，
+# 所以放在 PyInstaller runtime hook 里（比 app/main.py 还早）。
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+
+
 def _add_dll_dirs() -> None:
     if not sys.platform.startswith("win"):
         return
