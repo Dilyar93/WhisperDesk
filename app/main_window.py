@@ -357,7 +357,19 @@ class MainWindow(QMainWindow):
     def _on_failed(self, msg: str):
         self._reset_buttons()
         log.error("转写失败: %s", msg)
-        QMessageBox.critical(self, "转写失败", msg)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Critical)
+        box.setWindowTitle("转写失败")
+        box.setText(msg)
+        box.setInformativeText(
+            f"详细错误堆栈已写入日志文件：\n{config.log_path()}\n\n"
+            f"反馈问题时请附上该文件。"
+        )
+        open_log_btn = box.addButton("打开日志所在文件夹", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Ok)
+        box.exec()
+        if box.clickedButton() is open_log_btn:
+            self._open_folder(config.log_path().parent)
 
     def _reset_buttons(self):
         self.start_btn.setEnabled(True)
