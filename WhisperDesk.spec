@@ -44,6 +44,21 @@ for pkg in (
     binaries += _b
     hiddenimports += _h
 
+# cuDNN 8.x（仅 Windows）：ctranslate2 4.4 的 CUDA 推理依赖
+# cudnn_ops_infer64_8.dll 等文件，nvidia-cudnn-cu12 pip 包提供。
+# 这些 DLL 位于 site-packages/nvidia/cudnn/bin/ 下，把它们扁平到 _internal/
+# 以便 Windows DLL 搜索路径（和我们的 runtime hook）能命中。
+try:
+    import importlib.util
+    spec_cudnn = importlib.util.find_spec("nvidia.cudnn")
+    if spec_cudnn and spec_cudnn.submodule_search_locations:
+        import glob as _glob
+        cudnn_root = spec_cudnn.submodule_search_locations[0]
+        for _dll in _glob.glob(os.path.join(cudnn_root, "bin", "*.dll")):
+            binaries.append((_dll, "."))
+except Exception:
+    pass
+
 # 纯 Python 的 HTTP 链路 + hub 常见懒加载依赖
 hiddenimports += [
     "certifi",
