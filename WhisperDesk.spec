@@ -12,13 +12,14 @@ PyInstaller < 6.11.1 的已知 bug。处理办法是：
   - requirements.txt 钉 numpy<2；
   - requirements-build.txt 要求 pyinstaller>=6.11.1。
 """
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_all
 import os
 
 block_cipher = None
 
 binaries = []
 datas = []
+hiddenimports = []
 
 # 资源文件（QSS、图标）
 datas += [("app/resources/style.qss", "app/resources")]
@@ -28,28 +29,34 @@ if os.path.exists("app/resources/icon.ico"):
 # faster_whisper 自带的 silero VAD 模型等 assets（VAD 启用时必须存在）
 datas += collect_data_files("faster_whisper")
 
-# huggingface_hub 会动态 import requests / urllib3 / certifi / charset_normalizer 等，
-# PyInstaller 静态分析跟不到，需要整包 submodules + 显式 hiddenimports 兜底。
-hiddenimports = [
-    "ctranslate2",
-    "tokenizers",
+# 本地 import 探测确认的完整运行时闭包。带原生 DLL / C 扩展的包必须 collect_all。
+for pkg in (
+    "av",              # PyAV：解码音频，带 FFmpeg DLL
+    "onnxruntime",     # VAD 后端，带 onnxruntime*.dll
+    "ctranslate2",     # 推理后端，带 ctranslate2.dll / cublas 等
+    "tokenizers",      # Rust 扩展
+    "huggingface_hub",
     "requests",
-    "urllib3",
+):
+    _d, _b, _h = collect_all(pkg)
+    datas += _d
+    binaries += _b
+    hiddenimports += _h
+
+# 纯 Python 的 HTTP 链路 + hub 常见懒加载依赖
+hiddenimports += [
     "certifi",
     "charset_normalizer",
     "idna",
+    "urllib3",
     "filelock",
     "fsspec",
     "packaging",
     "tqdm",
-    "pyyaml",
+    "yaml",
 ]
-hiddenimports += collect_submodules("huggingface_hub")
-hiddenimports += collect_submodules("requests")
-
-# requests / certifi 需要带上 CA 证书等 data files
+# certifi 的 cacert.pem 必须带
 datas += collect_data_files("certifi")
-datas += collect_data_files("huggingface_hub")
 
 a = Analysis(
     ["app/main.py"],
