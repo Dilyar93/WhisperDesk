@@ -1,5 +1,10 @@
 faster-whisper==1.0.3
 ctranslate2==4.4.0
+# ctranslate2 4.4 用 CUDA 12 + cuDNN 8 编译，wheel 不自带 cuDNN，
+# 必须显式装 nvidia-cudnn-cu12 的 8.x，让打包器把 DLL 收进 _internal/。
+# 注意：9.x 与 ctranslate2 4.4 不兼容（ctranslate2 找 cudnn_*_8.dll 的硬编码名字）。
+nvidia-cudnn-cu12==8.9.7.29 ; platform_system == "Windows"
+# cuBLAS ctranslate2 通常自带；cuDNN 不自带，所以只补 cuDNN 即可。
 # 必须钉 numpy<2：numpy 2.x 的 _core._multiarray_umath 用 pybind11 单阶段初始化，
 # 若被 PyInstaller 重复打包会抛 `cannot load module more than once per process`。
 numpy>=1.24,<2
