@@ -8,6 +8,15 @@ WhisperDesk is a local desktop speech-to-text application powered by [faster-whi
 
 Your audio and transcripts stay on your computer. An internet connection is only required to install dependencies and download the model.
 
+## Project case study (STAR)
+
+| | Summary |
+| --- | --- |
+| **Situation** | Cloud transcription can expose sensitive recordings, while command-line tools create a barrier for everyday desktop users. |
+| **Task** | Build a practical local workflow that turns common audio and video files into transcripts and subtitles, stays responsive during long-running inference, and works on either a CPU or an NVIDIA GPU. |
+| **Action** | Built a PySide6 drag-and-drop interface around faster-whisper; moved model loading and inference to a `QThread` with live signals; added automatic device and precision selection, VAD, collision-free multi-format export, resilient path and logging behaviour, and automated Windows packaging. |
+| **Result** | Delivered an end-to-end local application supporting 9 input extensions and 4 export formats without sending recordings or transcripts to the cloud. It provides live progress, falls back to CPU when CUDA is unavailable, and separates the approximately 3 GB model from routine Windows builds. |
+
 ## Features
 
 - Select or drag and drop `mp3`, `wav`, `m4a`, `mp4`, `flac`, `ogg`, `aac`, `webm`, and `opus` files
@@ -172,6 +181,15 @@ Check `logs/whisperdesk.log` and `logs/whisperdesk-crash.log`. The packaged Wind
 WhisperDesk 是一个本地运行的桌面语音转文字工具。它使用 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) 和 CTranslate2 执行 Whisper 模型推理，并通过 PySide6 提供图形界面。
 
 音频和转写结果不会上传到云端；联网仅用于首次安装依赖和下载模型。
+
+## 项目案例（STAR）
+
+| | 概要 |
+| --- | --- |
+| **情境（Situation）** | 云端转写可能暴露敏感录音，而命令行工具对普通桌面用户存在使用门槛。 |
+| **任务（Task）** | 打造一套实用的本地工作流，把常见音视频文件转换为文字稿和字幕；长时间推理时界面仍保持响应，并兼容 CPU 与 NVIDIA GPU。 |
+| **行动（Action）** | 使用 PySide6 构建拖放式界面并集成 faster-whisper；将模型加载和推理移入 `QThread`，通过信号实时回传结果；加入设备与计算精度自动选择、VAD、防覆盖多格式导出、健壮的路径与日志处理，以及 Windows 自动化打包。 |
+| **结果（Result）** | 交付了端到端本地应用，支持 9 种输入扩展名和 4 种导出格式，录音与转写结果无需上传云端；应用可实时显示进度、CUDA 不可用时回退到 CPU，并将约 3 GB 的模型与常规 Windows 构建分离。 |
 
 ## 功能
 
